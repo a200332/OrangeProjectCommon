@@ -200,6 +200,8 @@ type
     procedure SleepThread(ATimeout:Integer;ACheckTerminateInterval:Integer=1000);
   end;
 
+//  TTimerThreadCanExecuteEvent=function(Sender:TObject):Boolean of object;
+
   /// <summary>
   ///   <para>
   ///     执行任务的线程
@@ -274,6 +276,9 @@ type
 
 
 
+var
+//  GlobalOnTimerThreadCanExecute:TTimerThreadCanExecuteEvent;
+  GlobalIsTimerThreadCanExecute:Boolean;
 
 
 /// <summary>
@@ -305,6 +310,8 @@ procedure FreeGlobalTimerThread2;
 //分个60次,如果线程没有中止,继续睡,
 //避免等在那里
 //procedure SleepThread(AThread:TThread;ATimeout:Integer;ACheckTerminateInterval:Integer=1000);
+
+
 
 
 implementation
@@ -512,6 +519,7 @@ end;
 procedure TTimerThread.Execute;
 var
   ATimerTask:TTimerTask;
+//  AIsCanExecute:Boolean;
 begin
   inherited;
 
@@ -519,6 +527,20 @@ begin
   begin
 
       ATimerTask:=nil;
+
+
+//      AIsCanExecute:=False;
+      repeat
+          //判断是否允许访问网络
+//          if Assigned(GlobalOnTimerThreadCanExecute) then
+//          begin
+//            AIsCanExecute:=GlobalOnTimerThreadCanExecute(Self);
+//          end;
+          if not GlobalIsTimerThreadCanExecute then
+          begin
+            Sleep(1000);
+          end;
+      until GlobalIsTimerThreadCanExecute;
 
 
 
@@ -739,6 +761,7 @@ initialization
   GlobalTimerThreadList:=TList.Create;
   GlobalTimerThread:=nil;
   GlobalTimerThread2:=nil;
+  GlobalIsTimerThreadCanExecute:=True;
 
 
 

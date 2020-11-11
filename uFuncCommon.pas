@@ -227,7 +227,7 @@ function ConvertToVariantDynArray(AVariants:Array of Variant):TVariantDynArray;
 
 function SaveStringToFile(AString:String;AFilePath:String{$IF CompilerVersion >= 21.0};AEncoding:TEncoding{$IFEND}):Boolean;
 function GetStringFromFile(AFilePath:String{$IF CompilerVersion >= 21.0};AEncoding:TEncoding{$IFEND}):String;
-{$IF CompilerVersion >= 21.0}
+{$IF CompilerVersion >= 30.0}
 //比2007高的版本
 function GetStringFromTextFile(AFilePath:String):String;
 {$IFEND}
@@ -267,6 +267,7 @@ function GetThumbFilePrefix(const AIsThumb:Boolean): String;
 
 
 
+
 //隐藏手机号码(中国的手机号码,国外的不一样)
 function HideMobPhone( num:string ):String;
 //隐藏银行卡号
@@ -275,19 +276,18 @@ function HideBankCardNumber( num:string ):String;
 function checkBankCardNo(cardNo:String):Boolean;
 
 
-
-{$IF CompilerVersion >= 21.0}
+{$IF CompilerVersion >= 30.0}
 //比D2007高的版本
 //是否是合法的手机号码(中国的手机号码,新西兰的手机号码,02+6到8位数字))
 function IsMobPhone( num:string ):boolean;
 //是否是虚拟手机号
 function IsVirtualMobPhone( num:string ):boolean;
-{$IFEND}
-
-
 
 //是否是合法的身份证号码(中国的身份证号码,国外的不一样)
 function ValidatePID(const APID: string): string;
+{$IFEND}
+
+
 
 //邮箱是否合法
 function CheckEmail(email:String):Boolean;
@@ -551,7 +551,7 @@ var
 begin
   Result:=False;
 
-  {$IFDEF NZ}
+  {$IF DEFINED(NZ) OR DEFINED(VCL)}
   Result:=True;
   {$ELSE}
   cardNo:=Trim(cardNo);
@@ -608,7 +608,7 @@ begin
 
   end;
 
-  {$ENDIF}
+  {$IFEND}
 
 end;
 
@@ -622,13 +622,16 @@ var
   I: Integer;
 begin
   Result:=num;
+  {$IFNDEF VCL}
   for I := Low(num) to High(num)-4 do
   begin
     Result[I]:='*';
   end;
+  {$ENDIF}
 end;
 
-{$IF CompilerVersion >= 21.0}
+{$IF CompilerVersion >= 30.0}
+
 function IsMobPhone( num:string ):boolean;
 //const
 //  cChinaMobile: string // 移动号码
@@ -767,9 +770,7 @@ begin
       end;
   {$ENDIF NZ}
 end;
-{$IFEND}
 
-{$IF CompilerVersion >= 21.0}
 function IsVirtualMobPhone( num:string ):boolean;
 begin
   Result:=False;
@@ -789,7 +790,6 @@ begin
   end;
 
 end;
-{$IFEND}
 
 function ValidatePID(const APID: string): string;
   {内部函数,取身份证号校验位,最后一位,对18位有效}
@@ -927,6 +927,7 @@ begin
      end;
   end;
 end;
+{$IFEND}
 
 
 function GetThumbFilePrefix(const AIsThumb:Boolean): String;
@@ -994,7 +995,7 @@ begin
                 StandardStrToDateTime('1970-01-01 00:00:00'),
                 ADateTime)
                 //+8时区
-                {$IF CompilerVersion >= 21.0}
+                {$IF CompilerVersion >= 30.0}
 //                -8*60*60
                 //比D2007高的版本
                 -TTimeZone.Local.UtcOffset.Hours*60*60
@@ -1011,7 +1012,7 @@ begin
                 StandardStrToDateTime('1970-01-01 00:00:00'),
                 ADateTime)
                 //+8时区
-                {$IF CompilerVersion >= 21.0}
+                {$IF CompilerVersion >= 30.0}
                 //比D2007高的版本
 //                -8*60*60
                 -TTimeZone.Local.UtcOffset.Hours*60*60*1000
@@ -1022,7 +1023,7 @@ end;
 function timeSince1970Interval(Const AInterval:Int64):TDateTime;
 begin
   //+8时区
-  Result:=(AInterval{$IF CompilerVersion >= 21.0}+TTimeZone.Local.UtcOffset.Hours*60*60{$IFEND})//秒
+  Result:=(AInterval{$IF CompilerVersion >= 30.0}+TTimeZone.Local.UtcOffset.Hours*60*60{$IFEND})//秒
           /(24*60*60)
           +StandardStrToDateTime('1970-01-01 00:00:00');
 end;
@@ -1030,7 +1031,7 @@ end;
 function timeSince1970MillionSecondsInterval(Const AMillionSecondsInterval:Int64):TDateTime;
 begin
   //+8时区
-  Result:=(AMillionSecondsInterval/1000{$IF CompilerVersion >= 21.0}+TTimeZone.Local.UtcOffset.Hours*60*60{$IFEND})//秒
+  Result:=(AMillionSecondsInterval/1000{$IF CompilerVersion >= 30.0}+TTimeZone.Local.UtcOffset.Hours*60*60{$IFEND})//秒
           /(24*60*60)
           +StandardStrToDateTime('1970-01-01 00:00:00');
 end;
@@ -1039,7 +1040,7 @@ end;
 
 function GetOS:String;
 begin
-  {$IF CompilerVersion >= 21.0}
+  {$IF CompilerVersion >= 30.0}
   //比2007高的版本
   case TOSVersion.Platform of
     pfWindows:
@@ -1149,7 +1150,7 @@ type
 const
   TextFormatFlag:array[tfAnsi..tfUtf8] of word=($0000,$FFFE,$FEFF,$EFBB);
 
-{$IF CompilerVersion >= 21.0}
+{$IF CompilerVersion >= 30.0}
 //比2007高的版本
 //获取文本文件的编码
 function GetTextFileEncoding(const AFileName: string): TEncoding;

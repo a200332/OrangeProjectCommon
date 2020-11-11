@@ -656,6 +656,8 @@ const
   Const_NoticeSubType_FocusedYou='focused_you';
   //有人点赞了你的内容
   Const_NoticeSubType_LikeMyContent='like_my_content';
+  //有人点赞了你的评论
+  Const_NoticeSubType_LikeMyComment='like_my_comment';
   //有人评论了你的内容
   Const_NoticeSubType_CommentMyContent='comment_my_content';
 

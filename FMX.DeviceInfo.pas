@@ -17,7 +17,8 @@ interface
 
 uses
   System.SysUtils, System.Types, System.Devices,
-  //  FMX.Platform
+    FMX.Platform ,
+    FMX.Types,
   {$IFDEF MSWINDOWS}
   //,
    Winapi.Windows
@@ -110,6 +111,8 @@ function IsDeviceType: TDeviceInfo.TDeviceClass;
 /// <summary> 青矬眍 磬 镫囗蝈 桦?蝈脲纛礤? [ALL PLATFORMS]</summary>
 function IsTablet: Boolean;
 
+
+procedure SetPortraitOrientation;
 /// <summary> 项痱疱蝽? 铕桢眚圉?? [ALL PLATFORMS] </summary>
 function IsPortraitOrientation: Boolean;
 
@@ -191,14 +194,27 @@ begin
 {$ENDIF}
 end;
 
-function IsPortraitOrientation: Boolean;
-//var
-//  FScreenService: IFMXScreenService;
+procedure SetPortraitOrientation;
+var
+  ScreenService: IFMXScreenService;
+  OrientSet: TScreenOrientations;
 begin
-//  Result := true;
-//  if TPlatformServices.Current.SupportsPlatformService(IFMXScreenService, FScreenService) then
-//    Result := (FScreenService.GetScreenOrientation = TScreenOrientation.Portrait) or
-//      (FScreenService.GetScreenOrientation = TScreenOrientation.InvertedPortrait);
+  if TPlatformServices.Current.SupportsPlatformService(IFMXScreenService, IInterface(ScreenService)) then
+  begin
+    OrientSet := [TScreenOrientation.soPortrait];
+    ScreenService.SetSupportedScreenOrientations(OrientSet);
+  end;
+end;
+
+
+function IsPortraitOrientation: Boolean;
+var
+  FScreenService: IFMXScreenService;
+begin
+  Result := true;
+  if TPlatformServices.Current.SupportsPlatformService(IFMXScreenService, FScreenService) then
+    Result := (FScreenService.GetScreenOrientation = TScreenOrientation.Portrait) or
+      (FScreenService.GetScreenOrientation = TScreenOrientation.InvertedPortrait);
 end;
 
 function IsLargePhone: Boolean;

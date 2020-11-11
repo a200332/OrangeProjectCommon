@@ -137,7 +137,7 @@ type
     FAlbumIndex:Integer;
     FAlbumName:String;
     //选择的原图list
-    FSelectedOriginPhotoList:TList<TDrawPicture>;
+    FSelectedOriginPhotoList:TList<TPhoto>;
   public
     procedure SyncSelectedPictureList;
     procedure GetImage(APhoto:TPhoto);
@@ -262,7 +262,7 @@ begin
   Self.FPictureList.Clear(False,True);
   for I := 0 to Self.FSelectedOriginPhotoList.Count-1 do
   begin
-    Self.FPictureList.Add(Self.FSelectedOriginPhotoList[I]);
+    Self.FPictureList.Add(Self.FSelectedOriginPhotoList[I].OriginBitmap);
   end;
 
   HideFrame;//();
@@ -369,7 +369,7 @@ end;
 constructor TFrameAllImage.Create(AOwner: TComponent);
 begin
   inherited;
-  FSelectedOriginPhotoList:=TList<TDrawPicture>.Create;
+  FSelectedOriginPhotoList:=TList<TPhoto>.Create;
   FPictureList:=TDrawPictureList.Create(ooReference);
 
   FNeedLoadThumbBitmapList:=TBaseList.Create(ooReference);
@@ -776,13 +776,13 @@ begin
   end
   else if FFlag='ItemSelected' then
   begin
-      if FSelectedOriginPhotoList.IndexOf(APhoto.OriginBitmap)<>-1 then
+      if FSelectedOriginPhotoList.IndexOf(APhoto)<>-1 then
       begin
-        FSelectedOriginPhotoList.Delete(FSelectedOriginPhotoList.IndexOf(APhoto.OriginBitmap));
+        FSelectedOriginPhotoList.Delete(FSelectedOriginPhotoList.IndexOf(APhoto));
       end
       else
       begin
-        FSelectedOriginPhotoList.Add(APhoto.OriginBitmap);
+        FSelectedOriginPhotoList.Add(APhoto);
       end;
   end;
 
@@ -1066,13 +1066,13 @@ begin
   if FFlag='ItemSelected' then
   begin
       //选中一张图片
-      if FSelectedOriginPhotoList.IndexOf(APhoto.OriginBitmap)<>-1 then
+      if FSelectedOriginPhotoList.IndexOf(APhoto)<>-1 then
       begin
-        FSelectedOriginPhotoList.Delete(FSelectedOriginPhotoList.IndexOf(APhoto.OriginBitmap));
+        FSelectedOriginPhotoList.Delete(FSelectedOriginPhotoList.IndexOf(APhoto));
       end
       else
       begin
-        FSelectedOriginPhotoList.Add(APhoto.OriginBitmap);
+        FSelectedOriginPhotoList.Add(APhoto);
       end;
   end;
 

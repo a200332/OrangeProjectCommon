@@ -16,6 +16,7 @@ interface
 
 implementation
 
+//{$IFNDEF HAS_SUPERPLAYER}
 
 {$IFDEF STATICLOAD_OPENSSL}
 uses
@@ -1076,5 +1077,6 @@ initialization
   LoadSymbols;
 
 {$ENDIF}
+//{$ENDIF}
 
 end.

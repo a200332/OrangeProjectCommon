@@ -3,6 +3,11 @@ unit AddPictureListSubFrame;
 
 interface
 
+
+//使用原生的选择媒体窗体
+{$DEFINE USE_NATIVE_SELECTMEDIA}
+
+
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants, 
   FMX.Types, FMX.Graphics, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.StdCtrls,
@@ -18,10 +23,11 @@ uses
   uPhotoManager,
 
 
+  uSelectMediaDialog,
+  //使用原生的选择媒体窗体
   {$IFDEF USE_NATIVE_SELECTMEDIA}
   uWindowsSelectMediaUI,
-  uSelectMediaDialog,
-  {$ENDIF USE_NATIVE_SELECTMEDIA}
+  {$ENDIF}
 
 
   {$IFDEF SKIN_SUPEROBJECT}
@@ -58,6 +64,18 @@ type
                                   var APicUploadSucc:Boolean
                                   ) of object;
 
+  //自定义上传视频文件事件
+  TCustomUploadVideoFileEvent=procedure(//视频文件路径
+                                        AVideoFilePath:String;
+                                        //播放链接
+                                        var AVideoUrl:String;
+                                        var AVideoFileId:String;
+                                        //服务端返回
+                                        var AServerResponse:String;
+                                        //视频上传是否成功
+                                        var AVideoUploadSucc:Boolean
+                                        ) of object;
+
 
   TFrameAddPictureListSub = class(TFrame,IControlForPageFramework)
     pnlPicture: TSkinFMXPanel;
@@ -68,10 +86,14 @@ type
     btnOK: TSkinFMXButton;
     btnReturn: TSkinFMXButton;
     btnDelPic: TSkinFMXButton;
+    imgVideoCover: TSkinFMXImage;
     procedure lvPicturesClickItem(AItem: TSkinItem);
     procedure btnDelPicClick(Sender: TObject);
     procedure btnOKClick(Sender: TObject);
     procedure btnReturnClick(Sender: TObject);
+    procedure lvPicturesPrepareDrawItem(Sender: TObject; ACanvas: TDrawCanvas;
+      AItemDesignerPanel: TSkinFMXItemDesignerPanel; AItem: TSkinItem;
+      AItemDrawRect: TRect);
   private
     FEditPictureItem:TSkinItem;
     procedure DoAddPictureFromMenu(Sender: TObject;ABitmap:TBitmap);
@@ -84,9 +106,12 @@ type
   private
     {$IFDEF USE_NATIVE_SELECTMEDIA}
     FSelectMediaDialog:TSelectMediaDialog;
-    {$ENDIF USE_NATIVE_SELECTMEDIA}
+    {$ENDIF}
     procedure DoSelectMediaResultEvent(Sender:TObject;
-                                        ASelectedFilePaths:TStringList);
+                                        ASelectedFileThumbPaths:TStringList;
+                                        ASelectedFilePaths:TStringList;
+                                        //选择的媒体列表
+                                        ASelectMediaList:TSelectMediaList);
   private
     FNeedUploadCount:Integer;
 
@@ -127,15 +152,22 @@ type
     FLocalFileNameAndStreamList:TStringList;
     //本地文件路径
     FLocalFilePathList:TStringList;
+    FLocalVideoFilePathList:TStringList;
     //上传成功之后的远程文件名
     FServerFileNameList:TStringList;
+    FServerVideoUrlList:TStringList;
+    FServerVideoFileIdList:TStringList;
 
     constructor Create(AOwner:TComponent);override;
     destructor Destroy;override;
   public
     OnChange:TNotifyEvent;
+    //是否允许多选图片
     IsUseMultiSelectPicture:Boolean;
+    //是否不能修改图片
     IsCanNotEditPicture:Boolean;
+    //自定义上传视频文件
+    OnCustomUploadVideoFile: TCustomUploadVideoFileEvent;
 
     procedure AlignControls;
     procedure Clear;
@@ -144,7 +176,7 @@ type
                     //图片值数组
                     //比如:'Upload\1003\repair_car_order_pic\2018\2018-09-27\64C8C8720E42401098D01A297FC68EEE.jpg'
                     APictureValues:Array of String;
-                    //图片Url数组
+                    //图片Url数组,用于显示
                     //比如:'http://www.orangeui.cn:10011/Upload/1003/repair_car_order_pic/2018/2018-09-27/64C8C8720E42401098D01A297FC68EEE.jpg'
                     APictureUrls:Array of String;
                     //是否需要剪裁
@@ -154,7 +186,8 @@ type
                     AClipHeight:Integer;
                     //允许几张
                     AMaxCount:Integer;
-                    AIsReadOnly:Boolean=False
+                    AIsReadOnly:Boolean=False;
+                    AVideoUrls:TStringDynArray=[]
                     );overload;
     //初始
     procedure Init( ACaption:String;
@@ -169,7 +202,8 @@ type
                     AClipHeight:Integer;
                     //允许几张
                     AMaxCount:Integer;
-                    AIsReadOnly:Boolean=False
+                    AIsReadOnly:Boolean=False;
+                    AVideoUrlList:TStringList=nil
                     );overload;
     function AddPicture(APicFilePath:String):Boolean;
     //保存到本地
@@ -192,7 +226,11 @@ type
 
     //获取上传后的值
     function GetServerFileNameArray(AMaxCount:Integer):TStringDynArray;
+    function GetServerVideoUrlArray(AMaxCount:Integer):TStringDynArray;
+    function GetServerVideoFileIdArray(AMaxCount:Integer):TStringDynArray;
     function GetServerFileName(AIndex:Integer):String;
+    function GetServerVideoUrl(AIndex:Integer):String;
+    function GetServerVideoFileId(AIndex:Integer):String;
     function GetLocalFileName(AIndex:Integer):String;
 
     //是否只读
@@ -382,7 +420,7 @@ end;
 
 procedure TFrameAddPictureListSub.Clear;
 begin
-  Self.lvPictures.Prop.Items.ClearItemsByType(sitDefault);
+  Self.lvPictures.Prop.Items.ClearItemsByTypeNot(sitItem1);
 end;
 
 constructor TFrameAddPictureListSub.Create(AOwner: TComponent);
@@ -390,10 +428,15 @@ begin
   inherited;
 
   FLocalFilePathList:=TStringList.Create;
+  FLocalVideoFilePathList:=TStringList.Create;
   FLocalFileNameAndStreamList:=TStringList.Create;
   FServerFileNameList:=TStringList.Create;
+  FServerVideoUrlList:=TStringList.Create;
+  FServerVideoFileIdList:=TStringList.Create;
 
-  Self.lvPictures.Prop.Items.ClearItemsByType(sitDefault);
+
+
+  Self.lvPictures.Prop.Items.ClearItemsByTypeNot(sitItem1);
 
 //  Init('商品图片',[],[],False,400,300,6);
 
@@ -406,11 +449,14 @@ destructor TFrameAddPictureListSub.Destroy;
 begin
 
   FreeAndNil(FLocalFilePathList);
+  FreeAndNil(FLocalVideoFilePathList);
   //清空一下里面的Stream,万一没有释放
   FreeStringListObjects(FLocalFileNameAndStreamList);
 
   FreeAndNil(FLocalFileNameAndStreamList);
   FreeAndNil(FServerFileNameList);
+  FreeAndNil(FServerVideoUrlList);
+  FreeAndNil(FServerVideoFileIdList);
 
   inherited;
 end;
@@ -478,44 +524,65 @@ begin
 end;
 
 procedure TFrameAddPictureListSub.DoSelectMediaResultEvent(Sender: TObject;
-  ASelectedFilePaths: TStringList);
+  ASelectedFileThumbPaths:TStringList;
+  ASelectedFilePaths: TStringList;
+  //选择的媒体列表
+  ASelectMediaList:TSelectMediaList);
 var
   I: Integer;
-  ScaleFactor: Single;
+//  AScaleFactor: Single;
 var
   AListViewItem:TSkinListViewItem;
   ABitmap:TBitmap;
 begin
 
 
-  for I := 0 to ASelectedFilePaths.Count-1 do
+  for I := 0 to ASelectMediaList.Count-1 do
   begin
-      ABitmap:=TBitmap.Create;
-      ABitmap.LoadFromFile(ASelectedFilePaths[I]);
-
-
-      //照片返回
-      //尺寸如果超过1024,那么需要按比例缩小
-      if ABitmap.Width > 1024 then
-      begin
-        ScaleFactor := ABitmap.Width / 1024;
-        ABitmap.Resize(Round(ABitmap.Width / ScaleFactor), Round(ABitmap.Height / ScaleFactor));
-      end;
-
 
       //添加一张图片
       AListViewItem:=Self.lvPictures.Prop.Items.Insert(Self.lvPictures.Prop.Items.Count-1);
       //要放在Icon.Assign前面
       AListViewItem.Icon.Url:='';
-      AListViewItem.Icon.Assign(ABitmap);
-      //避免花掉
-      CopyBitmap(ABitmap,AListViewItem.Icon);
+      AListViewItem.Icon.Name:=ASelectMediaList[I].FilePath;
+
+      if ASelectMediaList[I].ThumbPath<>'' then
+      begin
+          ABitmap:=TBitmap.Create;
+          ABitmap.LoadFromFile(ASelectMediaList[I].ThumbPath);
+
+
+          //照片返回
+          //尺寸如果超过1024,那么需要按比例缩小
+//          if ABitmap.Width > 1024 then
+//          begin
+//            AScaleFactor := ABitmap.Width / 1024;
+//            ABitmap.Resize(Round(ABitmap.Width / AScaleFactor), Round(ABitmap.Height / AScaleFactor));
+//          end;
+
+          AListViewItem.Icon.Assign(ABitmap);
+          //避免花掉
+          CopyBitmap(ABitmap,AListViewItem.Icon);
 
 
 
-      FreeAndNil(ABitmap);
+          FreeAndNil(ABitmap);
+      end;
+
+
+
+
+      //判断是否是图片还是视频
+//      if SameText(ExtractFileExt(ASelectMediaList[I].FilePath),'.mp4') then
+      if ASelectMediaList[I].IsVideo then
+      begin
+        //视频
+        AListViewItem.ItemType:=sitItem2;
+      end;
 
   end;
+
+
 
 
   AlignControls;
@@ -523,8 +590,11 @@ begin
 
 end;
 
-function TFrameAddPictureListSub.DoUploadFile(AImageHttpServerUrl:String;APicStream: TStream;
-  AFileName: String; var ARemoteFilePath: String;var AServerResponse:String): Boolean;
+function TFrameAddPictureListSub.DoUploadFile(AImageHttpServerUrl:String;
+  APicStream: TStream;
+  AFileName: String;
+  var ARemoteFilePath: String;
+  var AServerResponse:String): Boolean;
 var
   AHttpControl:THttpControl;
   AResponseStream:TStringStream;
@@ -565,32 +635,38 @@ begin
 
               if APicUploadSucc then
               begin
-                AResponseStream.Position:=0;
+                  AResponseStream.Position:=0;
 
 
 
-                //ASuperObject:=TSuperObject.ParseStream(AResponseStream);
-                //会报错'Access violation at address 004B6C7C in module ''Server.exe''. Read of address 00000000'
-                //要从AResponseStream.DataString加载
-                ASuperObject:=TSuperObject.Create(AResponseStream.DataString);
+                  //ASuperObject:=TSuperObject.ParseStream(AResponseStream);
+                  //会报错'Access violation at address 004B6C7C in module ''Server.exe''. Read of address 00000000'
+                  //要从AResponseStream.DataString加载
+                  ASuperObject:=TSuperObject.Create(AResponseStream.DataString);
 
-    //            '{"Code":200,"Desc":"\u4E0A\u4F20\u6587\u4EF6\u6210\u529F",
-    //            "Data":{
-    //            "RemoteFilePath":"Upload\\1002\\Shop_Pic\\2018\\2018-03-18\\C8B626D93B014B098B8BC829BE13D744.jpg",
-    //            "Url":"Upload/1002/Shop_Pic/2018/2018-03-18/C8B626D93B014B098B8BC829BE13D744.jpg"
-    //                  }
-    //            }'
+      //            '{"Code":200,"Desc":"\u4E0A\u4F20\u6587\u4EF6\u6210\u529F",
+      //            "Data":{
+      //            "RemoteFilePath":"Upload\\1002\\Shop_Pic\\2018\\2018-03-18\\C8B626D93B014B098B8BC829BE13D744.jpg",
+      //            "Url":"Upload/1002/Shop_Pic/2018/2018-03-18/C8B626D93B014B098B8BC829BE13D744.jpg"
+      //                  }
+      //            }'
 
-                if ASuperObject.I['Code']=200 then
-                begin
-                  //上传成功
-                  ARemoteFilePath:=ASuperObject.O['Data'].S['RemoteFilePath'];
-                  Result:=True;
-                end
-                else
-                begin
-                  //上传失败
-                end;
+                  if ASuperObject.I['Code']=200 then
+                  begin
+                    //上传成功
+                    ARemoteFilePath:=ASuperObject.O['Data'].S['RemoteFilePath'];
+                    Result:=True;
+                  end
+                  else
+                  begin
+                    //上传失败
+                  end;
+
+
+
+
+                  //上传视频
+
 
 
               end
@@ -612,7 +688,7 @@ procedure TFrameAddPictureListSub.DoReturnFrameFromAllImageFrame(
   AFrame: TFrame);
 var
   I: Integer;
-  ScaleFactor: Single;
+  AScaleFactor: Single;
 var
   AListViewItem:TSkinListViewItem;
   ABitmap:TBitmap;
@@ -621,28 +697,50 @@ begin
 
   for I := 0 to GAllImageFrame.FSelectedOriginPhotoList.Count-1 do
   begin
-      //照片返回
-      //尺寸如果超过1024,那么需要按比例缩小
-      if GAllImageFrame.FSelectedOriginPhotoList[I].Width > 1024 then
-      begin
-        ScaleFactor := GAllImageFrame.FSelectedOriginPhotoList[I].Width / 1024;
-        GAllImageFrame.FSelectedOriginPhotoList[I].Resize(Round(GAllImageFrame.FSelectedOriginPhotoList[I].Width / ScaleFactor), Round(GAllImageFrame.FSelectedOriginPhotoList[I].Height / ScaleFactor));
-      end;
 
-
-      ABitmap:=GAllImageFrame.FSelectedOriginPhotoList[I];
+      ABitmap:=GAllImageFrame.FSelectedOriginPhotoList[I].ThumbBitmap;
       //添加一张图片
       AListViewItem:=Self.lvPictures.Prop.Items.Insert(Self.lvPictures.Prop.Items.Count-1);
       //要放在Icon.Assign前面
       AListViewItem.Icon.Url:='';
       AListViewItem.Icon.Assign(ABitmap);
+      //图片或者视频路径
+      AListViewItem.Icon.Name:=GAllImageFrame.FSelectedOriginPhotoList[I].OriginFilePath;
+
       //避免花掉
       CopyBitmap(ABitmap,AListViewItem.Icon);
+
+
+      if GAllImageFrame.FSelectedOriginPhotoList[I].IsVideo then
+      begin
+
+          //要放在Icon.Assign前面
+          AListViewItem.ItemType:=sitItem2;
+
+      end
+      else
+      begin
+
+          //照片返回
+          //尺寸如果超过1024,那么需要按比例缩小
+          if GAllImageFrame.FSelectedOriginPhotoList[I].OriginBitmap.Width > 1024 then
+          begin
+            AScaleFactor := GAllImageFrame.FSelectedOriginPhotoList[I].OriginBitmap.Width / 1024;
+            GAllImageFrame.FSelectedOriginPhotoList[I].OriginBitmap.Resize(
+                            Round(GAllImageFrame.FSelectedOriginPhotoList[I].OriginBitmap.Width / AScaleFactor),
+                            Round(GAllImageFrame.FSelectedOriginPhotoList[I].OriginBitmap.Height / AScaleFactor)
+                            );
+          end;
+
+      end;
+
 
   end;
 
 
   AlignControls;
+
+
 
 //  if GAllImageFrame.FBtnSure then
 //  begin
@@ -652,8 +750,8 @@ begin
 //        //照片返回
 //        if GAllImageFrame.FOriginPhotoList[I].Width > 1024 then
 //        begin
-//          ScaleFactor := GAllImageFrame.FOriginPhotoList[I].Width / 1024;
-//          GAllImageFrame.FOriginPhotoList[I].Resize(Round(GAllImageFrame.FOriginPhotoList[I].Width / ScaleFactor), Round(GAllImageFrame.FOriginPhotoList[I].Height / ScaleFactor));
+//          AScaleFactor := GAllImageFrame.FOriginPhotoList[I].Width / 1024;
+//          GAllImageFrame.FOriginPhotoList[I].Resize(Round(GAllImageFrame.FOriginPhotoList[I].Width / AScaleFactor), Round(GAllImageFrame.FOriginPhotoList[I].Height / AScaleFactor));
 //        end;
 //      end;
 //      Self.DoAddPictureFromMenu(nil,GAllImageFrame.FOriginPhotoList);
@@ -815,6 +913,24 @@ begin
   end;
 end;
 
+function TFrameAddPictureListSub.GetServerVideoUrl(AIndex: Integer): String;
+begin
+  Result:='';
+  if AIndex<Self.lvPictures.Prop.Items.Count-1 then
+  begin
+    Result:=FServerVideoUrlList[AIndex];
+  end;
+end;
+
+function TFrameAddPictureListSub.GetServerVideoFileId(AIndex: Integer): String;
+begin
+  Result:='';
+  if AIndex<Self.lvPictures.Prop.Items.Count-1 then
+  begin
+    Result:=FServerVideoFileIdList[AIndex];
+  end;
+end;
+                      
 function TFrameAddPictureListSub.GetServerFileNameArray(AMaxCount:Integer):TStringDynArray;
 var
   I: Integer;
@@ -836,23 +952,79 @@ begin
   end;
 end;
 
-procedure TFrameAddPictureListSub.Init(ACaption: String; APictureValueList,
-  APictureUrlList: TStringList; AIsNeedClip: Boolean; AClipWidth, AClipHeight,
-  AMaxCount: Integer;AIsReadOnly:Boolean);
+function TFrameAddPictureListSub.GetServerVideoUrlArray(AMaxCount:Integer):TStringDynArray;
+var
+  I: Integer;
+begin
+  if Self.lvPictures.Prop.Items.Count-1>AMaxCount then
+  begin
+    AMaxCount:=Self.lvPictures.Prop.Items.Count-1;
+  end;
+
+  SetLength(Result,AMaxCount);
+  for I := 0 to AMaxCount-1 do
+  begin
+    Result[I]:='';
+  end;
+
+  for I := 0 to Self.FServerVideoUrlList.Count-1 do
+  begin
+    Result[I]:=FServerVideoUrlList[I];
+  end;
+end;
+
+function TFrameAddPictureListSub.GetServerVideoFileIdArray(AMaxCount:Integer):TStringDynArray;
+var
+  I: Integer;
+begin
+  if Self.lvPictures.Prop.Items.Count-1>AMaxCount then
+  begin
+    AMaxCount:=Self.lvPictures.Prop.Items.Count-1;
+  end;
+
+  SetLength(Result,AMaxCount);
+  for I := 0 to AMaxCount-1 do
+  begin
+    Result[I]:='';
+  end;
+
+  for I := 0 to Self.FServerVideoFileIdList.Count-1 do
+  begin
+    Result[I]:=FServerVideoFileIdList[I];
+  end;
+end;
+               
+procedure TFrameAddPictureListSub.Init(ACaption: String;
+  APictureValueList,
+  APictureUrlList: TStringList;
+  AIsNeedClip: Boolean;
+  AClipWidth,
+  AClipHeight,
+  AMaxCount: Integer;
+  AIsReadOnly:Boolean;
+  AVideoUrlList:TStringList);
 var
   //图片值数组
   APictureValues:Array of String;
   //图片Url数组
   APictureUrls:Array of String;
+  AVideoUrls:TStringDynArray;
   I: Integer;
 begin
   SetLength(APictureValues,APictureValueList.Count);
   SetLength(APictureUrls,APictureUrlList.Count);
+  SetLength(AVideoUrls,APictureValueList.Count);
   for I := 0 to APictureValueList.Count-1 do
   begin
     APictureValues[I]:=APictureValueList[I];
     APictureUrls[I]:=APictureUrlList[I];
+    if AVideoUrlList<>nil then
+    begin
+      AVideoUrls[I]:=AVideoUrlList[I];
+    end;
   end;
+
+
   Self.Init(ACaption,
             APictureValues,
             APictureUrls,
@@ -860,7 +1032,8 @@ begin
             AClipWidth,
             AClipHeight,
             AMaxCount,
-            AIsReadOnly);
+            AIsReadOnly,
+            AVideoUrls);
 
 end;
 
@@ -912,7 +1085,8 @@ procedure TFrameAddPictureListSub.Init(
   AIsNeedClip: Boolean;
   AClipWidth, AClipHeight,
   AMaxCount: Integer;
-  AIsReadOnly:Boolean);
+  AIsReadOnly:Boolean;
+  AVideoUrls: TStringDynArray);
 var
   I: Integer;
   AListViewItem:TSkinListViewItem;
@@ -928,7 +1102,7 @@ begin
 
   Self.lvPictures.Prop.Items.BeginUpdate;
   try
-    Self.lvPictures.Prop.Items.ClearItemsByType(sitDefault);
+    Self.lvPictures.Prop.Items.ClearItemsByTypeNot(sitItem1);
 
     for I := 0 to Length(APictureUrls)-1 do
     begin
@@ -942,6 +1116,12 @@ begin
           //立即下载
           AListViewItem.Icon.WebUrlPicture;
 
+
+          //视频链接
+          if Length(AVideoUrls)>I then
+          begin
+            AListViewItem.Icon.Caption:=AVideoUrls[I];
+          end;
 
     end;
 
@@ -1002,6 +1182,7 @@ begin
             FSelectMediaDialog:=TSelectMediaDialog.Create(Self);
             FSelectMediaDialog.OnSelectMediaResult:=DoSelectMediaResultEvent;
           end;
+          FSelectMediaDialog.SelectMediaType:=TSelectMediaType.smtImageVideo;
           FSelectMediaDialog.StartSelect;
           {$ELSE}
           HideFrame;
@@ -1044,17 +1225,30 @@ begin
 
 end;
 
+procedure TFrameAddPictureListSub.lvPicturesPrepareDrawItem(Sender: TObject;
+  ACanvas: TDrawCanvas; AItemDesignerPanel: TSkinFMXItemDesignerPanel;
+  AItem: TSkinItem; AItemDrawRect: TRect);
+begin
+  //
+  Self.imgVideoCover.Visible:=(AItem.ItemType=sitItem2);
+
+end;
+
 function TFrameAddPictureListSub.SaveToLocalTemp(AQuality:Integer;AFileExt:String):Boolean;
 var
   I:Integer;
   APicStream:TMemoryStream;
   AFileName:String;
+  ABitmap:TBitmap;
   ABitmapCodecSaveParams:TBitmapCodecSaveParams;
 begin
   FNeedUploadCount:=0;
 
   FServerFileNameList.Clear;
+  FServerVideoUrlList.Clear;
+  FServerVideoFileIdList.Clear;
   FLocalFilePathList.Clear;
+  FLocalVideoFilePathList.Clear;
   //清空一下里面的Stream,万一没有释放
   FreeStringListObjects(FLocalFileNameAndStreamList);
 
@@ -1062,33 +1256,65 @@ begin
   for I := 0 to Self.lvPictures.Prop.Items.Count-2 do
   begin
 
-    if (Self.lvPictures.Prop.Items[I].Icon.Url='') then
-    begin
-        //新添加或修改过的图片
-        AFileName:=CreateGUIDString+AFileExt;
-        ABitmapCodecSaveParams.Quality:=AQuality;
-        Self.lvPictures.Prop.Items[I].Icon.SaveToFile(
-                                                      System.IOUtils.TPath.GetDocumentsPath+PathDelim+AFileName,
-                                                      @ABitmapCodecSaveParams
-                                                      );
+        //是图片
+        if (Self.lvPictures.Prop.Items[I].Icon.Url='') then
+        begin
+
+            //新添加或修改过的图片
+            AFileName:=CreateGUIDString+AFileExt;
+            if Self.lvPictures.Prop.Items[I].ItemType=sitDefault then
+            begin
+                //图片
+                ABitmapCodecSaveParams.Quality:=AQuality;
+                ABitmap:=TBitmap.Create;
+                //图片
+                ABitmap.LoadFromFile(Self.lvPictures.Prop.Items[I].Icon.Name);
+                ABitmap.SaveToFile(
+                                  System.IOUtils.TPath.GetDocumentsPath+PathDelim+AFileName,
+                                  @ABitmapCodecSaveParams
+                                  );
+                FreeAndNil(ABitmap);
+
+                FLocalVideoFilePathList.Add('');
+
+            end
+            else
+            begin
+                //视频
+                //图片是缩略图,要上传缩略图
+                ABitmapCodecSaveParams.Quality:=100;
+                Self.lvPictures.Prop.Items[I].Icon.SaveToFile(
+                                                              System.IOUtils.TPath.GetDocumentsPath+PathDelim+AFileName,
+                                                              @ABitmapCodecSaveParams
+                                                              );
+                FLocalVideoFilePathList.Add(Self.lvPictures.Prop.Items[I].Icon.Name);
+            end;
+
+            //要上传的图片
+            APicStream:=TMemoryStream.Create;
+            APicStream.LoadFromFile(System.IOUtils.TPath.GetDocumentsPath+PathDelim+AFileName);
+
+            FLocalFileNameAndStreamList.AddObject(AFileName,APicStream);
+            Self.FLocalFilePathList.Add(System.IOUtils.TPath.GetDocumentsPath+PathDelim+AFileName);
+            FServerFileNameList.Add('');
+            FServerVideoUrlList.Add('');
+            FServerVideoFileIdList.Add('');
 
 
-        APicStream:=TMemoryStream.Create;
-        APicStream.LoadFromFile(System.IOUtils.TPath.GetDocumentsPath+PathDelim+AFileName);
+            Inc(FNeedUploadCount);
+        end
+        else
+        begin
+            //老图
+            FLocalFileNameAndStreamList.AddObject(Self.lvPictures.Prop.Items[I].Icon.Name,nil);
+            Self.FLocalFilePathList.Add('');
+            Self.FServerFileNameList.Add(Self.lvPictures.Prop.Items[I].Icon.Name);//Name中是服务端相对路径
+            FLocalVideoFilePathList.Add('');
+            Self.FServerVideoUrlList.Add(Self.lvPictures.Prop.Items[I].Icon.Caption);//Caption中是视频链接
+            Self.FServerVideoFileIdList.Add(Self.lvPictures.Prop.Items[I].Icon.Caption);//Caption中是视频链接
+        end;
+                            
 
-        FLocalFileNameAndStreamList.AddObject(AFileName,APicStream);
-        Self.FLocalFilePathList.Add(System.IOUtils.TPath.GetDocumentsPath+PathDelim+AFileName);
-        FServerFileNameList.Add('');
-
-        Inc(FNeedUploadCount);
-    end
-    else
-    begin
-        //原图
-        FLocalFileNameAndStreamList.AddObject(Self.lvPictures.Prop.Items[I].Icon.Name,nil);
-        Self.FLocalFilePathList.Add('');
-        Self.FServerFileNameList.Add(Self.lvPictures.Prop.Items[I].Icon.Name);
-    end;
   end;
 end;
 
@@ -1204,6 +1430,8 @@ var
   I: Integer;
   APicStream:TStream;
   ARemoteFilePath:String;
+  AVideoUrl:String;
+  AVideoFileId:String;
 begin
   Result:=False;
   AServerResponse:='';
@@ -1224,7 +1452,7 @@ begin
       if FServerFileNameList[I]='' then
       begin
 
-          APicStream:=TMemoryStream(FLocalFileNameAndStreamList.Objects[I]);
+          APicStream:=TStream(FLocalFileNameAndStreamList.Objects[I]);
           if APicStream<>nil then
           begin
 
@@ -1245,14 +1473,36 @@ begin
               end;
 
 
+              //上传视频
+              if (FLocalVideoFilePathList[I]<>'') 
+                  and Assigned(OnCustomUploadVideoFile) then
+              begin
+                  //自定义上传视频
+                  OnCustomUploadVideoFile(
+                                            FLocalVideoFilePathList[I],
+                                            AVideoUrl,
+                                            AVideoFileId,
+                                            AServerResponse,
+                                            Result);
+                  FServerVideoUrlList[I]:=AVideoUrl;
+                  FServerVideoFileIdList[I]:=AVideoFileId;
+              end;
+
+
+
               if Not APicUploadSucc then
               begin
                 //图片上传失败
                 //退出循环
                 Exit;
               end;
+
           end;
       end;
+
+      //上传视频
+
+
   end;
 
   Result:=True;

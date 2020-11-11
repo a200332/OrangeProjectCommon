@@ -13,6 +13,7 @@ uses
   uFuncCommon,
   uUIFunction,
   AllImageFrame,
+  uPhotoManager,
   uSelectMediaDialog;
 
 type
@@ -41,6 +42,7 @@ var
 //  ScaleFactor: Single;
 //var
 //  AListViewItem:TSkinListViewItem;
+  APhoto:TPhoto;
   ABitmap:TBitmap;
 //  APictures:TStringList;
   ABitmapCodecSaveParams:TBitmapCodecSaveParams;
@@ -63,13 +65,38 @@ begin
 //      else
 //      begin
 
+
+
           //默认发原图
-          ABitmap:=GAllImageFrame.FSelectedOriginPhotoList[I];
+          APhoto:=GAllImageFrame.FSelectedOriginPhotoList[I];
 
+          if APhoto.OriginFilePath<>'' then
+          begin
+              //有图片路径的,Windows,Android
+//              FSelectMediaDialog.FSelectedThumbFilePaths.Add(APhoto.ThumbFilePath);
+//              FSelectMediaDialog.FSelectedFilePaths.Add(APhoto.OriginFilePath);
 
-          AFilePath:=GetApplicationPath+CreateGUIDString()+'.png';
-          ABitmap.SaveToFile(AFilePath);
-          FSelectMediaDialog.FSelectedFilePaths.Add(AFilePath);
+              FSelectMediaDialog.AddSelectedMedia(APhoto.ThumbFilePath,
+                                                  APhoto.OriginFilePath,
+                                                  APhoto.IsVideo,
+                                                  320,
+                                                  480,
+                                                  //15秒
+                                                  15);
+          end
+          else
+          begin
+              //没有图片路径的,IOS
+              ABitmap:=GAllImageFrame.FSelectedOriginPhotoList[I].OriginBitmap;
+
+              AFilePath:=GetApplicationPath+CreateGUIDString()+'.png';
+              ABitmap.SaveToFile(AFilePath);
+//              FSelectMediaDialog.FSelectedThumbFilePaths.Add(AFilePath);
+//              FSelectMediaDialog.FSelectedFilePaths.Add(AFilePath);
+
+              FSelectMediaDialog.AddSelectedMedia(AFilePath,
+                                                  AFilePath);
+          end;
 
 //      end;
 
@@ -114,11 +141,13 @@ begin
   end;
 
 
-  if Assigned(FSelectMediaDialog.OnSelectMediaResult) then
-  begin
-    FSelectMediaDialog.OnSelectMediaResult(FSelectMediaDialog,
-                                          FSelectMediaDialog.FSelectedFilePaths);
-  end;
+//  if Assigned(FSelectMediaDialog.OnSelectMediaResult) then
+//  begin
+//    FSelectMediaDialog.OnSelectMediaResult(FSelectMediaDialog,
+//                                          FSelectMediaDialog.FSelectedThumbFilePaths,
+//                                          FSelectMediaDialog.FSelectedFilePaths);
+//  end;
+  FSelectMediaDialog.CallOnSelectMediaResult;
 
 
   //释放下相册管理中的缩略图和原图所占用的内存
@@ -147,14 +176,23 @@ begin
 
   AFilePath:=GetApplicationPath+CreateGUIDString()+'.png';
   Image.SaveToFile(AFilePath);
-  FSelectMediaDialog.FSelectedFilePaths.Add(AFilePath);
 
 
-  if Assigned(FSelectMediaDialog.OnSelectMediaResult) then
-  begin
-    FSelectMediaDialog.OnSelectMediaResult(FSelectMediaDialog,
-                                          FSelectMediaDialog.FSelectedFilePaths);
-  end;
+//  FSelectMediaDialog.FSelectedThumbFilePaths.Add(AFilePath);
+//  FSelectMediaDialog.FSelectedFilePaths.Add(AFilePath);
+
+
+  FSelectMediaDialog.AddSelectedMedia(AFilePath,
+                                      AFilePath);
+
+  FSelectMediaDialog.CallOnSelectMediaResult;
+
+//  if Assigned(FSelectMediaDialog.OnSelectMediaResult) then
+//  begin
+//    FSelectMediaDialog.OnSelectMediaResult(FSelectMediaDialog,
+//                                          FSelectMediaDialog.FSelectedThumbFilePaths,
+//                                          FSelectMediaDialog.FSelectedFilePaths);
+//  end;
 
 end;
 

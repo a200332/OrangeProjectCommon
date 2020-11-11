@@ -515,6 +515,13 @@ var
 begin
 //  ADataset.DisableControls;
 //  try
+
+    if not ADataset.Active then
+    begin
+      ADataset.Active:=True;
+    end;
+    
+
     for I := 0 to ASuperArray.Length-1 do
     begin
         ASuperObject:=ASuperArray.O[I];

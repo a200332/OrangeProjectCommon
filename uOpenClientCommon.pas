@@ -209,6 +209,9 @@ type
     user_type:Int64;//0,
     register_type:String;//"phone_num",
 
+//    birth:String;
+//    sign:string;
+
     wx_auth_code:String;//"",
     wx_union_id:String;//"",
     wx_open_id:String;//"",
@@ -2148,6 +2151,10 @@ type
     //登录状态
     IsLogin:Boolean;
 
+    //自动播放视频
+    AutoPlayVideoOnWiFi:string;
+    AutoPlayVideoWithoutWiFi:string;
+
     //服务器
     ServerHost:String;
     //服务器端口
@@ -3790,6 +3797,9 @@ begin
   sex:=AJson.I['sex'];//0,
   user_type:=AJson.I['user_type'];//0,
   register_type:=AJson.S['register_type'];//"phone_num",
+
+//  birth:=AJson.S['birth'];
+//  sign:= AJson.S['sign'];
 
   wx_auth_code:=AJson.S['wx_auth_code'];//"",
   wx_union_id:=AJson.S['wx_union_id'];//"",
@@ -8258,7 +8268,9 @@ begin
   Self.Area:=AIniFile.ReadString('','Area',Self.Area);
   Self.RegionName:=AIniFile.ReadString('','RegionName',Self.RegionName);
 
-
+  //自动播放视频
+  Self.AutoPlayVideoOnWiFi:=AIniFile.ReadString('','AutoPlayVideoOnWiFi',Self.AutoPlayVideoOnWiFi);
+  Self.AutoPlayVideoWithoutWiFi:=AIniFile.ReadString('','AutoPlayVideoWithoutWiFi',Self.AutoPlayVideoWithoutWiFi);
 
   CustomLoadFromINI(AIniFile);
 
@@ -8332,7 +8344,9 @@ begin
   AIniFile.WriteString('','Area',Self.Area);
   AIniFile.WriteString('','RegionName',Self.RegionName);
 
-
+  //自动播放视频
+  AIniFile.WriteString('','AutoPlayVideoOnWiFi',Self.AutoPlayVideoOnWiFi);
+  AIniFile.WriteString('','AutoPlayVideoWithoutWiFi',Self.AutoPlayVideoWithoutWiFi);
 
   CustomSaveToINI(AIniFile);
 

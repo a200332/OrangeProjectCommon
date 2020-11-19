@@ -35,6 +35,12 @@ type
     FtteGetRestDatasetPage:TTimerTaskEvent;
     FFieldDefsInterfaceUrl: String;
     FOnGetRestDatasetPage: TGetRestDatasetPageEvent;
+    FOnChange: TNotifyEvent;
+    FOnExecuteEnd: TNotifyEvent;
+    FOnExecuteBegin: TNotifyEvent;
+
+
+    procedure DoChange;
 
     procedure DoGetRestDatasetPageExecuteBegin(ATimerTask:TTimerTask);
     procedure DoGetRestDatasetPageExecute(ATimerTask:TTimerTask);
@@ -59,9 +65,15 @@ type
     procedure GetPriorPage;
     //下一页
     procedure GetNextPage;
+
+    procedure Refresh;
   public
     constructor Create(AOwner:TComponent);override;
     destructor Destroy;override;
+
+    property OnChange:TNotifyEvent read FOnChange write FOnChange;
+    property OnExecuteBegin:TNotifyEvent read FOnExecuteBegin write FOnExecuteBegin;
+    property OnExecuteEnd:TNotifyEvent read FOnExecuteEnd write FOnExecuteEnd;
   published
     //获取表结构的接口链接
     property FieldDefsInterfaceUrl:String read FFieldDefsInterfaceUrl write FFieldDefsInterfaceUrl;
@@ -81,6 +93,14 @@ destructor TRestMemTable.Destroy;
 begin
   FreeAndNil(FtteGetRestDatasetPage);
   inherited;
+end;
+
+procedure TRestMemTable.DoChange;
+begin
+  if Assigned(Self.FOnChange) then
+  begin
+    FOnChange(Self);
+  end;
 end;
 
 procedure TRestMemTable.DoGetRestDatasetPageExecute(ATimerTask: TTimerTask);
@@ -123,18 +143,21 @@ begin
         SumRecordCount:=ADataJson.I['SumCount'];
         PageCount:=Ceil(SumRecordCount/PageSize);
 
+        //放在线程中加载,不然会卡
         LoadDataJsonTokbmMemTable(Self,ADataJson,RECORDLIST_KEY);
-
 
     end
     else
     begin
         SumRecordCount:=0;
         PageCount:=Ceil(SumRecordCount/PageSize);
+
+
         TThread.Synchronize(nil,procedure
         begin
           Self.DisableControls;
         end);
+
         try
           Self.EmptyDataSet;
         finally
@@ -143,12 +166,20 @@ begin
             Self.EnableControls;
           end);
         end;
+
+
     end;
 
     if PageIndex>PageCount then
     begin
       PageIndex:=PageCount;
     end;
+
+
+    TThread.Synchronize(nil,procedure
+    begin
+      DoChange;
+    end);
 
   end;
 
@@ -184,6 +215,11 @@ end;
 
 procedure TRestMemTable.DoGetRestDatasetPageExecuteBegin(ATimerTask: TTimerTask);
 begin
+  //
+  if Assigned(OnExecuteBegin) then
+  begin
+    OnExecuteBegin(Self);
+  end;
 end;
 
 procedure TRestMemTable.DoGetRestDatasetPageExecuteEnd(ATimerTask: TTimerTask);
@@ -194,6 +230,10 @@ begin
       ShowMessage(TTimerTask(ATimerTask).TaskDesc);
     end;
   finally
+    if Assigned(OnExecuteEnd) then
+    begin
+      OnExecuteEnd(Self);
+    end;
   end;
 end;
 
@@ -281,6 +321,11 @@ begin
     PageIndex:=PageIndex-1;
     Self.FtteGetRestDatasetPage.Run();
   end;
+end;
+
+procedure TRestMemTable.Refresh;
+begin
+  Self.FtteGetRestDatasetPage.Run();
 end;
 
 end.

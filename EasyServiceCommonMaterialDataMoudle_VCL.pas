@@ -94,6 +94,8 @@ type
     cmbDefaultComboEditMaterial: TSkinComboEditDefaultMaterial;
     edtBottomWhiteDashEditMaterial: TSkinEditDefaultMaterial;
     imglistArrow: TSkinImageList;
+    btnButtonDefaultMaterial: TSkinButtonDefaultMaterial;
+    btnDropDownButtonMaterial: TSkinButtonDefaultMaterial;
   private
     { Private declarations }
   public
